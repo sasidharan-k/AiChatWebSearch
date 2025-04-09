@@ -1,0 +1,61 @@
+
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+.sortButton button{
+  width:100px;
+  height:50px;
+
+
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+.userContainer{
+  height:auto;
+  min-width:100px;
+  width:auto;
+  background-color: antiquewhite;
+  border:1px solid black;
+  padding:10px
+}
+.postUserContainer{
+  height:auto;
+  min-width:100px;
+  width:auto;
+  background-color: antiquewhite;
+  border:1px solid black;
+  padding:10px
+}
+.SearchContainer{
+  width:100%;
+  height:30px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+
+
+}
+.SearchContainer input{
+  width:40%;
+  height:30px;
+  border-radius: 10px;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
