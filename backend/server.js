@@ -1,15 +1,28 @@
+
+const OpenAI = require('openai')
 const express = require('express');
 const axios = require('axios');
+const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer');
 const cors = require('cors');
+const dotenv = require('dotenv');
+
+dotenv.config();
+
+
 const app = express();
-const PORT = 5000;
-
-
 app.use(cors());
 app.use(express.json());
+
+const PORT = 5000;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+// Initialize OpenAI with your API key
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 
 app.get('/screenshot', async (req, res) => {
@@ -32,7 +45,6 @@ app.get('/screenshot', async (req, res) => {
   }
 });
 
-
 app.post('/upload', async (req, res) => {
   const { image } = req.body;
 
@@ -41,22 +53,38 @@ app.post('/upload', async (req, res) => {
   }
 
   try {
-    const completionResponse = await axios.post('https://api.openai.com/v1/completions', {
-      model: 'gpt-4-vision',
-      prompt: 'tell me about image',
-      input_image: image,
-    }, {
-      headers: {
-        'Authorization': `Bearer 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`,
-        'Content-Type': 'application/json',
-      },
+
+    const buffer = Buffer.from(image, 'base64');
+    const imageInstance = await loadImage(buffer);
+    const canvas = createCanvas(imageInstance.width, imageInstance.height);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(imageInstance, 0, 0);
+    const pngBuffer = canvas.toBuffer('image/png');
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Summarize the content of this image.' },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:image/png;base64,${pngBuffer.toString('base64')}`,
+              },
+            },
+          ],
+        },
+      ],
+      max_tokens: 300,
     });
 
-
-    const analysis = openaiResponse.data.choices[0].message.content;
+    // Send the analysis response
+    const analysis = response.choices[0].message.content;
     res.json({ analysis });
+
   } catch (error) {
-    console.error('Error during image analysis:', error.response ? error.response.data : error.message);
+    console.error('Error during image analysis:', error);
     res.status(500).send('Error analyzing image.');
   }
 });
