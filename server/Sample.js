@@ -1,5 +1,4 @@
-
-const OpenAI = require('openai')
+const OpenAI = require('openai');
 const express = require('express');
 const axios = require('axios');
 const { createCanvas, loadImage } = require('canvas');
@@ -8,24 +7,27 @@ const path = require('path');
 const puppeteer = require('puppeteer');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const multer = require('multer');
 
 dotenv.config();
 
-
 const app = express();
-app.use(cors());
-app.use(express.json());
-
 const PORT = 5000;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-// Initialize OpenAI with your API key
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+
+const apiKey=process.env.OPENAI_API_KEY;
+
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 50 * 1024 * 1024 },
 });
 
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
 
 app.get('/screenshot', async (req, res) => {
+  console.log('Received screenshot request');
   const url = req.query.url;
   if (!url) {
     return res.status(400).json({ error: 'URL is required' });
@@ -40,28 +42,30 @@ app.get('/screenshot', async (req, res) => {
     await browser.close();
     res.sendFile(screenshotPath);
   } catch (error) {
-    console.error(error);
+    console.error('Error capturing screenshot:', error);
     res.status(500).json({ error: 'Error capturing screenshot' });
   }
 });
 
-app.post('/upload', async (req, res) => {
+app.post('/upload-image', async (req, res) => {
   const { image } = req.body;
 
   if (!image) {
-    return res.status(400).json({ error: 'Image data is required' });
+    return res.status(400).json({ error: 'Please capture a screenshot first.' });
   }
 
   try {
 
-    const buffer = Buffer.from(image, 'base64');
-    const imageInstance = await loadImage(buffer);
-    const canvas = createCanvas(imageInstance.width, imageInstance.height);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(imageInstance, 0, 0);
-    const pngBuffer = canvas.toBuffer('image/png');
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4',
+    const base64Data = image.split(',')[1];
+    const buffer = Buffer.from(base64Data, 'base64');
+
+
+    const formData = new FormData();
+    formData.append('file', buffer, { filename: 'screenshot.jpg', contentType: 'image/jpeg' });
+
+
+    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'user',
@@ -70,26 +74,28 @@ app.post('/upload', async (req, res) => {
             {
               type: 'image_url',
               image_url: {
-                url: `data:image/png;base64,${pngBuffer.toString('base64')}`,
+                url: `data:image/jpeg;base64,${base64Data}`,
               },
             },
           ],
         },
       ],
       max_tokens: 300,
+    }, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
     });
 
-    // Send the analysis response
-    const analysis = response.choices[0].message.content;
-    res.json({ analysis });
+    console.log('Response from OpenAI:', response.data);
+    res.json(response.data.choices[0].message.content);
 
   } catch (error) {
-    console.error('Error during image analysis:', error);
-    res.status(500).send('Error analyzing image.');
+    console.error('Error uploading image:', error);
+    res.status(500).json({ error: 'Error uploading image or communicating with OpenAI API.' });
   }
 });
-
-
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

@@ -6,6 +6,7 @@ function App() {
   const [screenshot, setScreenshot] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [data,setData] = useState('')
 
   const handleUrlChange = (e) => {
     setUrl(e.target.value);
@@ -38,29 +39,44 @@ function App() {
       setLoading(false);
     }
   };
-
-  const ImageUpload = async (e) => {
+  const ImageUpload = async () => {
     if (!screenshot) {
-      alert('Please select an image to upload.');
+      alert('Please capture a screenshot first.');
       return;
     }
 
     try {
+      const blob = await fetch(screenshot).then(res => res.blob());
 
-      const imageData = { image: screenshot };
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64data = reader.result.split(',')[1]; // Extract base64 data from the result
+        const base64ImageUrl = `data:image/jpeg;base64,${base64data}`;
 
+        try {
+          // Make the request to your backend server's upload-image endpoint
+          const response = await axios.post('http://localhost:5000/upload-image', {
+            image: base64ImageUrl, // Send base64 image string to the server
+          });
 
-      const response = await axios.post('http://localhost:5000/upload', imageData, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+          // Handle the response from your backend (which will return OpenAI's analysis)
+          console.log('OpenAI Response:', response.data);
+          setData(response.data); // Assuming you're using `setData` to display the result
 
-      console.log('Response from image analysis:', response.data);
+        } catch (apiError) {
+          console.error('Error calling backend upload-image:', apiError);
+        }
+      };
+
+      reader.readAsDataURL(blob); // Convert blob to base64
+
     } catch (error) {
-      console.error('Error uploading image:', error);
+      console.error('Error processing image:', error);
     }
   };
+
+
+
 
 
   return (
@@ -86,8 +102,13 @@ function App() {
         <div>
 
           <img src={screenshot} alt="Screenshot" style={{ width: '100%', maxWidth: '600px' }} />
-          <button type="submit" disabled={loading} onClick={ImageUpload}>Upload</button>
+          <div>   <button type="submit" disabled={loading} onClick={ImageUpload}>Upload</button></div>
+
+          {
+          data && ( <div>{data}</div>)
+        }
         </div>
+
 
       )}
     </div>
